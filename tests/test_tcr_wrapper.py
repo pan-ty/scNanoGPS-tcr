@@ -17,7 +17,7 @@ class TcrWrapperTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.environment = dict(os.environ)
-        for key in ("FASTQ_DIR", "WORK_DIR", "WHITELIST", "TCR_REPO", "NCORES",
+        for key in ("FASTQ_DIR", "WORK_DIR", "WHITELIST", "GPS_REPO", "NCORES",
                     "BARCODE_SUBSTITUTIONS", "PYTHON_BIN"):
             self.environment.pop(key, None)
 
@@ -46,6 +46,8 @@ class TcrWrapperTests(unittest.TestCase):
         self.assertTrue(lines[2].startswith("FASTQ_DIR="))
         self.assertTrue(lines[3].startswith("WORK_DIR="))
         self.assertTrue(lines[4].startswith("WHITELIST="))
+        self.assertEqual(lines[2:5], ["FASTQ_DIR=''", "WORK_DIR=''", "WHITELIST=''"])
+        self.assertIn("GPS_REPO=", generated.read_text())
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), ["run_tcr_sample.sh"])
         subprocess.run(["bash", "-n", str(generated)], check=True)
 
@@ -59,7 +61,7 @@ class TcrWrapperTests(unittest.TestCase):
     def test_paths_are_literal_and_stage_argument_is_forwarded(self):
         repo, capture = self.stub_runner()
         literal = str(self.root / "reads $(touch INJECTED) `touch INJECTED2` 'quoted'")
-        result = self.generate("--output", "custom run.sh", TCR_REPO=str(repo),
+        result = self.generate("--output", "custom run.sh", GPS_REPO=str(repo),
                                FASTQ_DIR=literal, WORK_DIR=str(self.root / "output space"),
                                WHITELIST=str(self.root / "whitelist with spaces.txt.gz"), NCORES="12")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -74,9 +76,9 @@ class TcrWrapperTests(unittest.TestCase):
         self.assertFalse((self.root / "INJECTED").exists())
         self.assertFalse((self.root / "INJECTED2").exists())
 
-    def test_editing_work_path_updates_default_whitelist_path(self):
+    def test_editing_work_path_keeps_whitelist_empty_until_explicitly_set(self):
         repo, capture = self.stub_runner()
-        result = self.generate(TCR_REPO=str(repo))
+        result = self.generate(GPS_REPO=str(repo))
         self.assertEqual(result.returncode, 0, result.stderr)
         generated = self.root / "run_tcr_sample.sh"
         work = str(self.root / "edited working directory")
@@ -87,7 +89,7 @@ class TcrWrapperTests(unittest.TestCase):
                        env=dict(self.environment, CAPTURE=str(capture)), check=True)
         observed = json.loads(capture.read_text())["settings"]
         self.assertEqual(observed["WORK_DIR"], work)
-        self.assertEqual(observed["WHITELIST"], str(Path(work) / "reference/whitelist_ob.txt.gz"))
+        self.assertEqual(observed["WHITELIST"], "")
 
     def test_pipeline_actions_are_not_mistaken_for_generation_options(self):
         result = self.generate("export")

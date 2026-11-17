@@ -3,10 +3,10 @@
 # Activate the scNanoGPS conda environment before running this script.
 set -euo pipefail
 
-TCR_REPO="${TCR_REPO:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
-FASTQ_DIR="${FASTQ_DIR:-/data/nanopore/2026/NP359_TCR_Enrich_CGF021-022_PBMC_OCM_Prom114_WANG_07022026/20260702_1712_2A_PBM45682_e171202b/fastq_pass}"
-WORK_DIR="${WORK_DIR:-/data/Extra_data_USERs/Tim/HR_transplant/CGF/tcr_enrichment/NP359}"
-WHITELIST="${WHITELIST:-$WORK_DIR/reference/whitelist_ob.txt.gz}"
+GPS_REPO="${GPS_REPO:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+FASTQ_DIR="${FASTQ_DIR:-}"
+WORK_DIR="${WORK_DIR:-}"
+WHITELIST="${WHITELIST:-}"
 SCANNER_DIR="${SCANNER_DIR:-$WORK_DIR/scanner}"
 EXPORT_DIR="${EXPORT_DIR:-$WORK_DIR/export}"
 NCORES="${NCORES:-8}"
@@ -42,7 +42,7 @@ require_whitelist() {
 run_scanner() {
     [[ -d "$FASTQ_DIR" ]] || die "FASTQ directory not found: $FASTQ_DIR"
     [[ ! -e "$SCANNER_DIR" ]] || die "Scanner directory already exists: $SCANNER_DIR. Use 'export' for completed Scanner output or choose a new SCANNER_DIR."
-    [[ -r "$TCR_REPO/scanner.py" ]] || die "Cannot find scanner.py in $TCR_REPO"
+    [[ -r "$GPS_REPO/scanner.py" ]] || die "Cannot find scanner.py in $GPS_REPO"
     [[ "$NCORES" =~ ^[1-9][0-9]*$ ]] || die "NCORES must be a positive integer"
     require_command "$PYTHON_BIN"
     "$PYTHON_BIN" -c 'import Bio, numpy'
@@ -51,7 +51,7 @@ run_scanner() {
     printf '%s\n' 'Note: concatenated reads are not split; the exporter quarantines detected internal Read 1 adapters.'
     (
         cd "$WORK_DIR"
-        "$PYTHON_BIN" "$TCR_REPO/scanner.py" \
+        "$PYTHON_BIN" "$GPS_REPO/scanner.py" \
             -i "$FASTQ_DIR" \
             -d "$SCANNER_DIR" \
             --log "$WORK_DIR/logs/scanner.log.txt" \
@@ -66,10 +66,10 @@ export_fastqs() {
     [[ -r "$SCANNER_DIR/processed.fastq.gz" && -r "$SCANNER_DIR/barcode_list.tsv.gz" ]] ||
         die "Paired Scanner outputs not found in $SCANNER_DIR"
     [[ "$BARCODE_SUBSTITUTIONS" == 0 || "$BARCODE_SUBSTITUTIONS" == 1 ]] || die "BARCODE_SUBSTITUTIONS must be 0 or 1"
-    [[ -r "$TCR_REPO/tcr_export.py" ]] || die "Cannot find tcr_export.py in $TCR_REPO"
+    [[ -r "$GPS_REPO/tcr_export.py" ]] || die "Cannot find tcr_export.py in $GPS_REPO"
     require_command "$PYTHON_BIN"
     mkdir -p "$WORK_DIR/logs"
-    "$PYTHON_BIN" "$TCR_REPO/tcr_export.py" \
+    "$PYTHON_BIN" "$GPS_REPO/tcr_export.py" \
         --scanner-dir "$SCANNER_DIR" \
         --whitelist "$WHITELIST" \
         --max-barcode-substitutions "$BARCODE_SUBSTITUTIONS" \
@@ -80,9 +80,16 @@ export_fastqs() {
 [[ $# -le 1 ]] || { usage >&2; exit 2; }
 case "${1:-all}" in
     -h|--help) usage ;;
-    scan) run_scanner ;;
-    export) export_fastqs ;;
+    scan)
+        [[ -n "$FASTQ_DIR" && -n "$WORK_DIR" ]] || die "Set FASTQ_DIR and WORK_DIR at the top of run_tcr_sample.sh."
+        run_scanner
+        ;;
+    export)
+        [[ -n "$WORK_DIR" && -n "$WHITELIST" ]] || die "Set WORK_DIR and WHITELIST at the top of run_tcr_sample.sh."
+        export_fastqs
+        ;;
     all)
+        [[ -n "$FASTQ_DIR" && -n "$WORK_DIR" && -n "$WHITELIST" ]] || die "Set FASTQ_DIR, WORK_DIR, and WHITELIST at the top of run_tcr_sample.sh."
         [[ ! -e "$SCANNER_DIR" ]] || die "Scanner directory already exists. Use 'export' or choose a new SCANNER_DIR."
         [[ ! -e "$EXPORT_DIR" ]] || die "Export directory already exists. Choose a new EXPORT_DIR."
         [[ -d "$FASTQ_DIR" ]] || die "FASTQ directory not found: $FASTQ_DIR"

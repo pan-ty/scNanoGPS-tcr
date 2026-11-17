@@ -11,7 +11,7 @@ not start analysis or require an activated conda environment. Edit FASTQ_DIR,
 WORK_DIR, and WHITELIST in the generated file, activate the scNanoGPS conda
 environment, then run: bash run_tcr_sample.sh [all|scan|export]
 
-Default paths are for NP359. FASTQ_DIR, WORK_DIR, WHITELIST, TCR_REPO, NCORES,
+Sample paths default to empty. FASTQ_DIR, WORK_DIR, WHITELIST, GPS_REPO, NCORES,
 BARCODE_SUBSTITUTIONS, and PYTHON_BIN may also be set when generating the file.
 Existing files are never overwritten; use --output to choose another name.
 HELP
@@ -36,9 +36,10 @@ esac
     exit 1
 }
 
-TCR_REPO="${TCR_REPO:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
-FASTQ_DIR="${FASTQ_DIR:-/data/nanopore/2026/NP359_TCR_Enrich_CGF021-022_PBMC_OCM_Prom114_WANG_07022026/20260702_1712_2A_PBM45682_e171202b/fastq_pass}"
-WORK_DIR="${WORK_DIR:-/data/Extra_data_USERs/Tim/HR_transplant/CGF/tcr_enrichment/NP359}"
+GPS_REPO="${GPS_REPO:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)}"
+FASTQ_DIR="${FASTQ_DIR:-}"
+WORK_DIR="${WORK_DIR:-}"
+WHITELIST="${WHITELIST:-}"
 NCORES="${NCORES:-8}"
 BARCODE_SUBSTITUTIONS="${BARCODE_SUBSTITUTIONS:-0}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
@@ -50,19 +51,15 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
         printf '%s\n' '#!/usr/bin/env bash' '# Edit these paths for this sequencing library.'
         printf 'FASTQ_DIR=%q\n' "$FASTQ_DIR"
         printf 'WORK_DIR=%q\n' "$WORK_DIR"
-        if [[ -n "${WHITELIST:-}" ]]; then
-            printf 'WHITELIST=%q\n' "$WHITELIST"
-        else
-            printf '%s\n' 'WHITELIST="$WORK_DIR/reference/whitelist_ob.txt.gz"'
-        fi
+        printf 'WHITELIST=%q\n' "$WHITELIST"
         printf '\n%s\n' '# Fork location and run settings; use the existing scNanoGPS conda environment.'
-        printf 'TCR_REPO=%q\nNCORES=%q\nBARCODE_SUBSTITUTIONS=%q\nPYTHON_BIN=%q\n' \
-            "$TCR_REPO" "$NCORES" "$BARCODE_SUBSTITUTIONS" "$PYTHON_BIN"
+        printf 'GPS_REPO=%q\nNCORES=%q\nBARCODE_SUBSTITUTIONS=%q\nPYTHON_BIN=%q\n' \
+            "$GPS_REPO" "$NCORES" "$BARCODE_SUBSTITUTIONS" "$PYTHON_BIN"
         cat <<'RUN'
 
 set -euo pipefail
-export FASTQ_DIR WORK_DIR WHITELIST TCR_REPO NCORES BARCODE_SUBSTITUTIONS PYTHON_BIN
-exec bash "$TCR_REPO/run_tcr_pipeline.sh" "$@"
+export FASTQ_DIR WORK_DIR WHITELIST GPS_REPO NCORES BARCODE_SUBSTITUTIONS PYTHON_BIN
+exec bash "$GPS_REPO/run_tcr_pipeline.sh" "$@"
 RUN
     } > "$OUTPUT"
 )

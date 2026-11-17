@@ -23,21 +23,22 @@ it is launched. It does not start analysis. Run the generator from the sample's
 working directory on the server:
 
 ```bash
-cd /data/Extra_data_USERs/Tim/HR_transplant/CGF/tcr_enrichment/NP359
+cd /path/to/sample_working_directory
 bash ~/tools/scNanoGPS-tcr/run_tcr.sh
 ```
 
 Edit the three paths at the top of the generated `run_tcr_sample.sh`:
 
 ```bash
-FASTQ_DIR=/path/to/fastq_pass
-WORK_DIR=/path/to/working_directory
-WHITELIST="$WORK_DIR/reference/whitelist_ob.txt.gz"
+FASTQ_DIR=""
+WORK_DIR=""
+WHITELIST=""
 ```
 
-The initial paths are filled for NP359. For another library, generate a new file
-in that library's directory and edit its paths. The repository path is captured
-when the file is generated, so it can be launched from another directory later.
+These sample paths default to empty and must be filled before analysis. For
+another library, generate a new file in that library's directory and edit its
+paths. `GPS_REPO` captures the repository path when the file is generated, so
+it can be launched from another directory later.
 Activate the existing conda environment and run the generated file:
 
 ```bash
