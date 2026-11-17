@@ -1,0 +1,20 @@
+# Local sequencing data, references, and generated analysis outputs.
+__pycache__/
+*.pyc
+.venv/
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.bam
+*.bai
+*.sam
+*.rda
+*.rds
+*.xlsx
+/results/
+/tcr_reference/
+/tcr_export/
+/scNanoGPS_res/
+/tmp/
+/logs/

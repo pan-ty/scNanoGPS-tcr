@@ -1,6 +1,121 @@
 [![Latest Release](https://img.shields.io/github/v/release/gaolabtools/scNanoGPS.svg?label=Latest%20Release)](https://github.com/gaolabtools/scNanoGPS/releases/latest)
 
 # scNanoGPS: Single cell Nanopore sequencing analysis of Genotype and Phenotype Simultaneously
+
+## TCR fork: export enriched reads without cell calling
+
+This fork adds `tcr_export.py` for targeted TCR libraries. It takes the paired
+`processed.fastq.gz` and `barcode_list.tsv.gz` outputs from Scanner, assigns reads
+against a barcode reference, and exports one trimmed FASTQ per sample/barcode.
+It does not run Assigner, genome-based Curator filtering, or Reporter. Barcodes
+with only one assigned read are retained; there are no barcode read-count or
+UMI-count thresholds. These are barcode exports, not a list of called cells.
+
+The original workflow remains available below. The upstream `Copyright` applies
+to this fork, including its non-commercial research/education terms.
+
+### Input preparation
+
+Identify and split concatenated reads with a separately validated preprocessing
+step before Scanner: Scanner searches the read ends and does not assign each
+internal molecule independently. The exporter quarantines processed reads with
+an additional exact Read 1 adapter in either orientation. This is a conservative
+guard, not a complete concatemer detector or splitter; adapter errors can evade it.
+
+Run Scanner from a local working directory, keeping raw sequencing inputs
+read-only. For a 10x 3' library with 16-base barcodes and 12-base UMIs:
+
+```bash
+mkdir -p /path/to/local_work/scanner /path/to/local_work/logs
+cd /path/to/local_work
+python /path/to/scNanoGPS-tcr/scanner.py \
+    -i /path/to/single_molecule_fastqs \
+    -d scanner --log logs/scanner.log.txt \
+    --lCB 16 --lUMI 12 -t 8
+```
+
+Scanner requires its normal Biopython dependencies. The exporter itself requires
+only Python >= 3.8 and the standard library. It preserves Scanner's sequence
+orientation, sequence, and base qualities; it does not perform extra poly-T
+trimming or UMI consensus. The original read identifier is retained with the UMI
+appended after an underscore, plus `CB`, `CR`, `RX`, and (for OCM) `OG` header tags.
+
+### OCM libraries
+
+Use a full 16-base barcode-to-OB reference, not an abundance-selected list of
+called cells. The reference is a TSV (optionally gzipped) with columns
+`barcode` and `ocm_group`; the sample map is a TSV with columns `ocm_group` and
+`sample_id`. Reference barcodes must be unique across the OB groups.
+
+For local study metadata containing `sample_id`, `NP_id`, and `NB_id` columns,
+and an RDA object named `OB` with `OB1` through `OB4`, prepare these files with:
+
+```bash
+Rscript other_utils/prepare_tcr_reference.R \
+    --sample-paths /path/to/sample_paths.xlsx \
+    --ob-rda /path/to/OB.rda \
+    --pool-id SOURCE_POOL_ID \
+    --output /path/to/local_work/tcr_reference
+
+python tcr_export.py \
+    --scanner-dir /path/to/local_work/scanner \
+    --ocm-reference /path/to/local_work/tcr_reference/ocm_barcodes.tsv.gz \
+    --sample-map /path/to/local_work/tcr_reference/sample_map.tsv \
+    --output /path/to/local_work/tcr_export
+```
+
+The R helper requires `readxl`. Select the source cDNA pool ID from the sample
+spreadsheet when an enrichment run has a different sequencing run ID. Keep the
+generated references, sample identities, and sequencing files local.
+
+### Non-OCM libraries
+
+A non-OCM library has one fixed sample identity and uses a chemistry-matched
+barcode whitelist, one full 16-base barcode per line. Do not split it into OB
+groups. The R helper detects a source pool whose `NB_id` is blank and writes
+`sample_id.txt` instead of an OCM reference; the appropriate barcode whitelist
+must still be supplied separately.
+
+```bash
+python tcr_export.py \
+    --scanner-dir /path/to/local_work/scanner \
+    --whitelist /path/to/chemistry_matched_barcodes.txt.gz \
+    --sample-id SampleA \
+    --output /path/to/local_work/tcr_export
+```
+
+### Matching, outputs, and validation
+
+Matching is exact by default. `--max-barcode-substitutions 1` optionally rescues
+a barcode only when exactly one full reference barcode is one substitution
+away, searching across all supplied OB groups. It does not correct indels or
+ambiguous bases. References and extracted barcodes must share the same orientation.
+Inspect pilot exact-match rates before enabling correction.
+
+Outputs include `fastq/<sample>/<barcode>.fastq.gz`, `barcodes.tsv` (including
+read counts and paths), `assignments.tsv.gz` (one decision per processed read),
+`summary.json`, and `unassigned.fastq.gz` when any reads are unassigned. Ambiguous
+matches, unknown sample groups, invalid UMIs, and detected internal adapters are
+retained in the unassigned output for review. The output directory must be new;
+input files are never modified. Repeat `--scanner-dir` to combine chunks of the
+same library. Independently prepared libraries must be exported separately.
+
+MiXCR input preparation should read the preserved UMI from the read identifier
+or header; the UMI is not prepended to the biological sequence by this exporter.
+Use a cell-aware ONT workflow for per-barcode UMI consensus and receptor calling.
+Genome alignment is not a prerequisite for this export.
+
+```bash
+python -B -m unittest discover -s tests -p 'test_tcr_export.py' -v
+```
+
+The tests cover single-read retention, OCM/non-OCM routing, ambiguous barcode
+correction, preservation of qualities and UMIs, multi-chunk exports, limited
+open file handles, internal-adapter quarantine, paired input validation, and
+refusal to overwrite existing results. Biological validation of splitting and
+TCR recovery is required before a full enriched-library analysis.
+
+---
 scNanoGPS is a computational toolkit for analyzing high throughput single cell nanopore sequencing data to detect Genotypes and Phenotype Simultaneously from same cells.  scNanoGPS includes 5 major steps: 1) **NanoQC** to perform quality control of the raw seqeucning data; 2) **Scanner** to scan and filter out reads that do not have expected adapater sequence patterns, i.e., TrueSeq Read 1 adapter sequence, TSO adaper sequence, poly (A/T)n block sequence,  Cell Barcodes (CB) and unique molecule identifier (UMI) sequence blocks; 3) **Assigner** to detect the list of true cell barcodes, merge cell barcodes with sequencing errors and assign raw reads into single cells; 4) **Curator** to detect reads with true UMIs and collapse them to make consensus sequences of individual molecules to curate sequencing errors on gene bodies; 5) **Reporter** to detect single cell transcriptomes, single cell gene isoforms and single cell mutations from consensus single cell long reads data.
 
 # Keywords
