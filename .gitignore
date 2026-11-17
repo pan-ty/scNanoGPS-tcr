@@ -18,3 +18,6 @@ __pycache__/
 /scNanoGPS_res/
 /tmp/
 /logs/
+
+# Per-library run scripts generated in the repository root.
+/run_tcr_sample.sh

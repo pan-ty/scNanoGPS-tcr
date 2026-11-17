@@ -16,37 +16,48 @@ The upstream Scanner, Assigner, Curator, and Reporter entry points remain
 available. The new workflow runs Scanner and the exporter only. The upstream
 `Copyright` applies, including its non-commercial research/education terms.
 
-### Run the NP359 server wrapper
+### Generate an editable sample run script
 
-The root-level `run_tcr.sh` supplies the NP359 FASTQ and working paths. Activate
-the existing conda environment, select the TCR branch, and run it with Bash:
+The root-level `run_tcr.sh` generates `run_tcr_sample.sh` in the directory where
+it is launched. It does not start analysis. Run the generator from the sample's
+working directory on the server:
+
+```bash
+cd /data/Extra_data_USERs/Tim/HR_transplant/CGF/tcr_enrichment/NP359
+bash ~/tools/scNanoGPS-tcr/run_tcr.sh
+```
+
+Edit the three paths at the top of the generated `run_tcr_sample.sh`:
+
+```bash
+FASTQ_DIR=/path/to/fastq_pass
+WORK_DIR=/path/to/working_directory
+WHITELIST="$WORK_DIR/reference/whitelist_ob.txt.gz"
+```
+
+The initial paths are filled for NP359. For another library, generate a new file
+in that library's directory and edit its paths. The repository path is captured
+when the file is generated, so it can be launched from another directory later.
+Activate the existing conda environment and run the generated file:
 
 ```bash
 conda activate scNanoGPS
-cd ~/tools/scNanoGPS-tcr
-git switch tcr-preprocessing
-git pull --ff-only
-bash run_tcr.sh --help
+bash run_tcr_sample.sh
 ```
 
-Supply a plain-text or gzipped whitelist through the same `WHITELIST` setting
-for both OB and non-OB libraries. It contains one full 16-base barcode per line,
-with no header, sample label, or OB column. For NP359 the default location is
-`WORK_DIR/reference/whitelist_ob.txt.gz`.
+The generated script calls `run_tcr_pipeline.sh` in the fork to run Scanner and
+the exporter. It accepts `scan` or `export` to run just one stage, for example
+`bash run_tcr_sample.sh export`. The generator refuses to overwrite an existing
+file so edited paths are preserved. Use `bash ~/tools/scNanoGPS-tcr/run_tcr.sh
+--output run_another_sample.sh` to choose a different generated filename.
 
-```bash
-WHITELIST=/path/to/whitelist_ob.txt.gz bash run_tcr.sh
-# Same interface for a standard 10x whitelist:
-WHITELIST=/path/to/10x_barcodes.txt.gz bash run_tcr.sh
-```
-
-The wrapper does not read OB.rda, sample maps, or Excel files and has no OB mode.
-It requires the activated Python environment; R is not needed. Use `scan` or
-`export` to run only one stage. Existing Scanner/export directories are not
-overwritten. Paths, `NCORES` (default 8), and `BARCODE_SUBSTITUTIONS` (default 0)
-can be overridden with environment variables. The wrapper uses NP359's 16-base
-barcode and 12-base UMI layout. Other chemistries may require code and Scanner
-parameter changes. Keep generated whitelist files and study metadata local.
+Supply a standard plain-text or gzipped whitelist through `WHITELIST` for both
+OB and non-OB libraries: one full 16-base barcode per line, no header or OB/sample
+column. The pipeline does not consume OB.rda, Excel, or sample maps, and performs
+no sample assignment. Generated scripts also expose `NCORES` (default 8),
+`BARCODE_SUBSTITUTIONS` (default 0), and `PYTHON_BIN` near the top. Existing
+Scanner/export directories are not overwritten. The runner uses the 16-base
+barcode and 12-base UMI layout; other chemistries may need changes.
 
 ### Run Scanner and export directly
 
@@ -92,13 +103,16 @@ adapter errors can evade it. Validate splitting and TCR recovery before using
 results for cell-level receptor pairing.
 
 ```bash
-python -B -m unittest discover -s tests -p 'test_tcr_export.py' -v
+python -B -m unittest discover -s tests -p 'test_tcr_*.py' -v
 ```
 
 Tests cover single-read retention, flat barcode-only outputs, exact and unique
 substitution matching, preservation of UMIs/qualities, multiple chunks, bounded
 file handles, internal-adapter quarantine, input validation, and overwrite
-protection. Full enriched-library analysis remains to be validated.
+protection. Wrapper tests verify generation in the caller's directory without
+starting analysis, editable settings, literal paths, forwarded stage arguments,
+and preservation of existing generated files. Full enriched-library analysis
+remains to be validated.
 
 ---
 scNanoGPS is a computational toolkit for analyzing high throughput single cell nanopore sequencing data to detect Genotypes and Phenotype Simultaneously from same cells.  scNanoGPS includes 5 major steps: 1) **NanoQC** to perform quality control of the raw seqeucning data; 2) **Scanner** to scan and filter out reads that do not have expected adapater sequence patterns, i.e., TrueSeq Read 1 adapter sequence, TSO adaper sequence, poly (A/T)n block sequence,  Cell Barcodes (CB) and unique molecule identifier (UMI) sequence blocks; 3) **Assigner** to detect the list of true cell barcodes, merge cell barcodes with sequencing errors and assign raw reads into single cells; 4) **Curator** to detect reads with true UMIs and collapse them to make consensus sequences of individual molecules to curate sequencing errors on gene bodies; 5) **Reporter** to detect single cell transcriptomes, single cell gene isoforms and single cell mutations from consensus single cell long reads data.
